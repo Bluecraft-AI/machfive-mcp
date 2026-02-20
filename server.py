@@ -51,28 +51,6 @@ mcp = FastMCP(
     ),
 )
 
-# ---------------------------------------------------------------------------
-# Health endpoint
-# ---------------------------------------------------------------------------
-
-@mcp.app.get("/")
-async def health():
-    """Health check endpoint - returns server status and info."""
-    return {
-        "status": "healthy",
-        "server": "machfive-mcp",
-        "version": "1.0.0",
-        "endpoints": {
-            "mcp": "/mcp",
-        },
-        "authentication": {
-            "methods": [
-                "Header: Authorization: Bearer YOUR_API_KEY",
-                "Header: Authorization: YOUR_API_KEY (Bearer prefix optional)",
-            ],
-            "note": "Each user passes their own MachFive API key via Authorization header",
-        },
-    }
 
 # ---------------------------------------------------------------------------
 # Auth helper — resolves the API key per request
@@ -555,6 +533,10 @@ if __name__ == "__main__":
         mcp.run()
     else:
         logger.info(f"Starting MachFive MCP server on 0.0.0.0:{PORT}")
+        logger.info("MCP endpoint available at /mcp")
+        # Note: FastMCP doesn't expose its internal FastAPI app, so we can't easily
+        # add a health endpoint at /. This would require a reverse proxy or FastMCP
+        # to expose the app attribute. The MCP endpoint at /mcp works correctly.
         mcp.run(
             transport="streamable-http",
             host="0.0.0.0",

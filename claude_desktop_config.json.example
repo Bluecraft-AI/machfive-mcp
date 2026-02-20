@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "machfive-remote": {
+      "url": "https://mcp.machfive.io/mcp",
+      "headers": {
+        "Authorization": "Bearer mf_live_YOUR_API_KEY_HERE"
+      }
+    },
+    "machfive-local": {
+      "command": "/path/to/uv",
+      "args": [
+        "run",
+        "--python", "3.12",
+        "--with", "fastmcp",
+        "--with", "httpx",
+        "/path/to/machfive-mcp/server.py"
+      ],
+      "env": {
+        "MACHFIVE_API_KEY": "mf_live_YOUR_API_KEY_HERE",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}

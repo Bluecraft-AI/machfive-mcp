@@ -71,7 +71,7 @@ git push -u origin main
 4. Generate a domain (or add custom domain: `mcp.machfive.io`)
 5. **Important:** Increase Railway timeout to 700 seconds (Settings → Networking) for `generate_sequence` calls
 
-Your MCP endpoint will be at: `https://YOUR-DOMAIN/mcp`
+Your MCP endpoint will be at: `https://mcp.machfive.io/mcp`
 
 ## Tools
 

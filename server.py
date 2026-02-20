@@ -49,7 +49,6 @@ mcp = FastMCP(
         "generate_sequence (single lead) or generate_batch (multiple leads). "
         "For batches: poll get_list_status until completed, then call export_list."
     ),
-    stateless_http=True,
 )
 
 # ---------------------------------------------------------------------------
@@ -537,4 +536,5 @@ if __name__ == "__main__":
             transport="streamable-http",
             host="0.0.0.0",
             port=PORT,
+            stateless_http=True,
         )

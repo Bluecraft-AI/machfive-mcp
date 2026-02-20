@@ -21,8 +21,6 @@ import os
 import json as _json
 import logging
 import httpx
-import uvicorn
-from fastapi import FastAPI
 from fastmcp import FastMCP, Context
 from fastmcp.server.dependencies import get_http_headers
 
@@ -534,6 +532,10 @@ if __name__ == "__main__":
             print("Set it: export MACHFIVE_API_KEY=mf_live_...")
         mcp.run()
     else:
+        # Import FastAPI/uvicorn only for HTTP mode (not needed for stdio)
+        import uvicorn
+        from fastapi import FastAPI
+
         # Create the MCP ASGI app
         mcp_app = mcp.http_app(path="/mcp", stateless_http=True)
 

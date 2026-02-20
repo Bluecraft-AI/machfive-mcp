@@ -21,6 +21,8 @@ import os
 import json as _json
 import logging
 import httpx
+import uvicorn
+from fastapi import FastAPI
 from fastmcp import FastMCP, Context
 from fastmcp.server.dependencies import get_http_headers
 
@@ -532,14 +534,33 @@ if __name__ == "__main__":
             print("Set it: export MACHFIVE_API_KEY=mf_live_...")
         mcp.run()
     else:
+        # Create the MCP ASGI app
+        mcp_app = mcp.http_app(path="/mcp", stateless_http=True)
+
+        # Create wrapper FastAPI app with health endpoint
+        app = FastAPI(title="MachFive MCP Server", lifespan=mcp_app.lifespan)
+
+        @app.get("/")
+        async def health():
+            """Health check — returns server status and auth info."""
+            return {
+                "status": "healthy",
+                "server": "machfive-mcp",
+                "version": "1.0.0",
+                "endpoints": {
+                    "mcp": "/mcp",
+                },
+                "authentication": {
+                    "methods": [
+                        "Header: Authorization: Bearer YOUR_API_KEY",
+                        "Header: Authorization: YOUR_API_KEY (Bearer prefix optional)",
+                    ],
+                    "note": "Each user passes their own MachFive API key via Authorization header",
+                },
+            }
+
+        # Mount MCP server
+        app.mount("/", mcp_app)
+
         logger.info(f"Starting MachFive MCP server on 0.0.0.0:{PORT}")
-        logger.info("MCP endpoint available at /mcp")
-        # Note: FastMCP doesn't expose its internal FastAPI app, so we can't easily
-        # add a health endpoint at /. This would require a reverse proxy or FastMCP
-        # to expose the app attribute. The MCP endpoint at /mcp works correctly.
-        mcp.run(
-            transport="streamable-http",
-            host="0.0.0.0",
-            port=PORT,
-            stateless_http=True,
-        )
+        uvicorn.run(app, host="0.0.0.0", port=PORT)

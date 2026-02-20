@@ -61,14 +61,18 @@ def _get_api_key() -> str:
 
     Priority:
       1. Authorization header from the incoming HTTP request (per-user)
+         - Accepts "Bearer YOUR_KEY" or just "YOUR_KEY" (Bearer prefix optional)
       2. MACHFIVE_API_KEY environment variable (fallback for stdio/local)
     """
     try:
         headers = get_http_headers()
         if headers:
-            auth = headers.get("authorization", "")
-            if auth.startswith("Bearer "):
-                return auth.removeprefix("Bearer ").strip()
+            auth = headers.get("authorization", "").strip()
+            if auth:
+                # Strip Bearer prefix if present
+                if auth.startswith("Bearer "):
+                    return auth.removeprefix("Bearer ").strip()
+                return auth
     except Exception:
         # Not in HTTP context (stdio mode) — fall through to env var
         pass
@@ -532,15 +536,40 @@ if __name__ == "__main__":
             print("Set it: export MACHFIVE_API_KEY=mf_live_...")
         mcp.run()
     else:
-        # Import FastAPI/uvicorn only for HTTP mode (not needed for stdio)
+        # Lazy imports — only needed for HTTP transport, not stdio
         import uvicorn
         from fastapi import FastAPI
+        from starlette.middleware.base import BaseHTTPMiddleware
+        from starlette.requests import Request as StarletteRequest
+        from starlette.datastructures import MutableHeaders
 
         # Create the MCP ASGI app
         mcp_app = mcp.http_app(path="/mcp", stateless_http=True)
 
         # Create wrapper FastAPI app with health endpoint
         app = FastAPI(title="MachFive MCP Server", lifespan=mcp_app.lifespan)
+
+        # -- Middleware: /mcp/{api_key} → /mcp with Authorization header --
+        class URLPathAuthMiddleware(BaseHTTPMiddleware):
+            """Rewrite /mcp/{api_key} to /mcp and inject Authorization header.
+
+            This lets MCP clients that don't support custom headers pass
+            the API key directly in the URL path instead.
+            """
+            async def dispatch(self, request: StarletteRequest, call_next):
+                path = request.scope.get("path", "")
+                # Match /mcp/{api_key} — key is everything after /mcp/
+                if path.startswith("/mcp/") and len(path) > 5:
+                    api_key = path[5:]  # strip "/mcp/"
+                    # Rewrite path to /mcp
+                    request.scope["path"] = "/mcp"
+                    # Inject Authorization header if not already present
+                    if not request.headers.get("authorization"):
+                        headers = MutableHeaders(scope=request.scope)
+                        headers.append("authorization", f"Bearer {api_key}")
+                return await call_next(request)
+
+        app.add_middleware(URLPathAuthMiddleware)
 
         @app.get("/")
         async def health():
@@ -551,13 +580,15 @@ if __name__ == "__main__":
                 "version": "1.0.0",
                 "endpoints": {
                     "mcp": "/mcp",
+                    "mcp_with_key": "/mcp/{api_key}",
                 },
                 "authentication": {
                     "methods": [
+                        "URL path: /mcp/YOUR_API_KEY",
                         "Header: Authorization: Bearer YOUR_API_KEY",
                         "Header: Authorization: YOUR_API_KEY (Bearer prefix optional)",
                     ],
-                    "note": "Each user passes their own MachFive API key via Authorization header",
+                    "note": "Each user passes their own MachFive API key. Bearer prefix is optional for Authorization header.",
                 },
             }
 

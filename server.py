@@ -52,6 +52,29 @@ mcp = FastMCP(
 )
 
 # ---------------------------------------------------------------------------
+# Health endpoint
+# ---------------------------------------------------------------------------
+
+@mcp.app.get("/")
+async def health():
+    """Health check endpoint - returns server status and info."""
+    return {
+        "status": "healthy",
+        "server": "machfive-mcp",
+        "version": "1.0.0",
+        "endpoints": {
+            "mcp": "/mcp",
+        },
+        "authentication": {
+            "methods": [
+                "Header: Authorization: Bearer YOUR_API_KEY",
+                "Header: Authorization: YOUR_API_KEY (Bearer prefix optional)",
+            ],
+            "note": "Each user passes their own MachFive API key via Authorization header",
+        },
+    }
+
+# ---------------------------------------------------------------------------
 # Auth helper — resolves the API key per request
 # ---------------------------------------------------------------------------
 

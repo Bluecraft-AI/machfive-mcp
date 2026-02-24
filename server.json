@@ -7,6 +7,10 @@
     "source": "github"
   },
   "version": "1.0.0",
+  "icon": {
+    "url": "https://raw.githubusercontent.com/Bluecraft-AI/machfive-mcp/main/assets/icon.png",
+    "mimeType": "image/png"
+  },
   "remotes": [
     {
       "type": "streamable-http",

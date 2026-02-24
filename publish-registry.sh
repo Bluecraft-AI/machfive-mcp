@@ -20,6 +20,10 @@ MACHFIVE_JSON=$(cat <<EOF
     "source": "github"
   },
   "version": "${VERSION}",
+  "icon": {
+    "url": "https://raw.githubusercontent.com/Bluecraft-AI/machfive-mcp/main/assets/icon.png",
+    "mimeType": "image/png"
+  },
   "remotes": [
     {
       "type": "streamable-http",
@@ -41,6 +45,10 @@ COLD_EMAIL_JSON=$(cat <<EOF
     "source": "github"
   },
   "version": "${VERSION}",
+  "icon": {
+    "url": "https://raw.githubusercontent.com/Bluecraft-AI/machfive-mcp/main/assets/icon.png",
+    "mimeType": "image/png"
+  },
   "remotes": [
     {
       "type": "streamable-http",

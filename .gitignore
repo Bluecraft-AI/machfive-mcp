@@ -43,3 +43,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# MCP Publisher
+mcp-publisher
+.mcpregistry_*

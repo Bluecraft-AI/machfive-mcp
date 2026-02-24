@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.Bluecraft-AI/machfive",
-  "description": "Generate hyper-personalized cold email sequences via MachFive API.",
+  "name": "io.github.Bluecraft-AI/cold-email",
+  "description": "Generate hyper-personalized cold email sequences via AI.",
   "repository": {
     "url": "https://github.com/Bluecraft-AI/machfive-mcp",
     "source": "github"
@@ -10,7 +10,13 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.machfive.io/mcp"
+      "url": "https://mcp.machfive.io/mcp/{api_key}",
+      "variables": {
+        "api_key": {
+          "description": "Your MachFive API key",
+          "isRequired": true
+        }
+      }
     }
   ]
 }

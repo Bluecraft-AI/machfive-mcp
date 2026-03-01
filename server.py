@@ -20,7 +20,10 @@ Tools:
 import os
 import json as _json
 import logging
+from typing import Annotated
+
 import httpx
+from pydantic import Field
 from fastmcp import FastMCP, Context
 from fastmcp.server.dependencies import get_http_headers
 
@@ -103,21 +106,26 @@ def _error_message(response: httpx.Response) -> str:
 # Tool 1 — List Campaigns
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
-async def list_campaigns(query: str = "") -> str:
+@mcp.tool(annotations={
+    "title": "List Campaigns",
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+})
+async def list_campaigns(
+    query: Annotated[str, Field(
+        description="Search string to filter campaigns by name (case-insensitive substring match). Leave empty to list all.",
+    )] = "",
+) -> str:
     """List campaigns in the user's MachFive workspace.
 
     CALL THIS FIRST before generate_sequence or generate_batch — you need a
     campaign ID to generate emails. If the user hasn't specified a campaign,
     call this and ask them to pick one.
 
-    Args:
-        query: Optional search string to filter campaigns by name
-               (case-insensitive substring match). Leave empty to list all.
-
-    Returns:
-        JSON array of campaigns with id, name, and created_at.
-        Use the 'id' field as campaign_id in generate calls.
+    Returns JSON array of campaigns with id, name, and created_at.
+    Use the 'id' field as campaign_id in generate calls.
     """
     params = {}
     if query:
@@ -149,20 +157,50 @@ async def list_campaigns(query: str = "") -> str:
 # Tool 2 — Generate Sequence (single lead, synchronous)
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
+@mcp.tool(annotations={
+    "title": "Generate Email Sequence",
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": False,
+    "openWorldHint": True,
+})
 async def generate_sequence(
-    campaign_id: str,
-    email: str,
-    name: str = "",
-    title: str = "",
-    company: str = "",
-    company_website: str = "",
-    linkedin_url: str = "",
-    email_count: int = 3,
-    list_name: str = "",
-    email_signature: str = "",
-    campaign_angle: str = "",
-    approved_ctas: str = "",
+    campaign_id: Annotated[str, Field(
+        description="Campaign UUID from list_campaigns.",
+    )],
+    email: Annotated[str, Field(
+        description="Lead's email address (REQUIRED).",
+    )],
+    name: Annotated[str, Field(
+        description="Lead's full name (improves personalization).",
+    )] = "",
+    title: Annotated[str, Field(
+        description="Lead's job title (improves personalization).",
+    )] = "",
+    company: Annotated[str, Field(
+        description="Lead's company name (improves personalization).",
+    )] = "",
+    company_website: Annotated[str, Field(
+        description="Company URL for AI research.",
+    )] = "",
+    linkedin_url: Annotated[str, Field(
+        description="LinkedIn profile URL for deeper personalization.",
+    )] = "",
+    email_count: Annotated[int, Field(
+        description="Number of emails in sequence, 1-5.",
+    )] = 3,
+    list_name: Annotated[str, Field(
+        description="Display name for this list in MachFive UI.",
+    )] = "",
+    email_signature: Annotated[str, Field(
+        description="Signature appended to each email.",
+    )] = "",
+    campaign_angle: Annotated[str, Field(
+        description="Additional context/angle for personalization.",
+    )] = "",
+    approved_ctas: Annotated[str, Field(
+        description="Comma-separated CTAs, e.g. 'Direct Meeting CTA, Lead Magnet CTA'. Omit to use campaign defaults.",
+    )] = "",
 ) -> str:
     """Generate a personalized cold email sequence for ONE lead.
 
@@ -171,26 +209,8 @@ async def generate_sequence(
     seems slow; wait for the response.
 
     You must have a campaign_id first. Call list_campaigns if you don't have one.
-
-    Args:
-        campaign_id: Campaign UUID (from list_campaigns).
-        email: Lead's email address (REQUIRED).
-        name: Lead's full name (improves personalization).
-        title: Lead's job title (improves personalization).
-        company: Lead's company name (improves personalization).
-        company_website: Company URL for AI research.
-        linkedin_url: LinkedIn profile URL for deeper personalization.
-        email_count: Number of emails in sequence, 1-5 (default 3).
-        list_name: Display name for this list in MachFive UI.
-        email_signature: Signature appended to each email.
-        campaign_angle: Additional context/angle for personalization.
-        approved_ctas: Comma-separated CTAs (e.g. "Direct Meeting CTA, Lead Magnet CTA").
-                       Omit to use campaign defaults.
-
-    Returns:
-        The generated email sequence (step, subject, body per email)
-        plus credits remaining. If the request times out, use the returned
-        list_id with get_list_status and export_list to recover results.
+    If the request times out, use the returned list_id with get_list_status
+    and export_list to recover results.
     """
     lead = {"email": email}
     if name:
@@ -250,41 +270,43 @@ async def generate_sequence(
 # Tool 3 — Generate Batch (multiple leads, asynchronous)
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
+@mcp.tool(annotations={
+    "title": "Generate Batch",
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": False,
+    "openWorldHint": True,
+})
 async def generate_batch(
-    campaign_id: str,
-    leads_json: str,
-    email_count: int = 3,
-    list_name: str = "",
-    email_signature: str = "",
-    campaign_angle: str = "",
-    approved_ctas: str = "",
+    campaign_id: Annotated[str, Field(
+        description="Campaign UUID from list_campaigns.",
+    )],
+    leads_json: Annotated[str, Field(
+        description='JSON array of lead objects. Each MUST have "email". Optional: name, title, company, company_website, linkedin_url. Example: \'[{"email":"jane@acme.com","name":"Jane Doe"}]\'',
+    )],
+    email_count: Annotated[int, Field(
+        description="Number of emails per lead, 1-5.",
+    )] = 3,
+    list_name: Annotated[str, Field(
+        description="Display name for this batch in MachFive UI.",
+    )] = "",
+    email_signature: Annotated[str, Field(
+        description="Signature appended to each email.",
+    )] = "",
+    campaign_angle: Annotated[str, Field(
+        description="Additional context/angle for personalization.",
+    )] = "",
+    approved_ctas: Annotated[str, Field(
+        description="Comma-separated CTAs. Omit to use campaign defaults.",
+    )] = "",
 ) -> str:
     """Submit multiple leads for batch email sequence generation (ASYNC).
 
     Returns IMMEDIATELY with a list_id. Processing runs in the background.
-
-    IMPORTANT — after calling this, you MUST:
-      1. Call get_list_status with the returned list_id
-      2. Poll every 15-30 seconds until processing_status is 'completed' or 'failed'
-      3. When completed, call export_list to get the results
+    After calling this, poll get_list_status every 15-30 seconds until
+    processing_status is 'completed' or 'failed', then call export_list.
 
     You must have a campaign_id first. Call list_campaigns if you don't have one.
-
-    Args:
-        campaign_id: Campaign UUID (from list_campaigns).
-        leads_json: JSON array of lead objects. Each lead MUST have an 'email' field.
-                    Optional fields: name, title, company, company_website, linkedin_url.
-                    Example: '[{"email":"jane@acme.com","name":"Jane Doe","company":"Acme"}]'
-        email_count: Number of emails per lead, 1-5 (default 3).
-        list_name: Display name for this batch in MachFive UI.
-        email_signature: Signature appended to each email.
-        campaign_angle: Additional context/angle for personalization.
-        approved_ctas: Comma-separated CTAs. Omit to use campaign defaults.
-
-    Returns:
-        list_id and status. Use list_id to poll with get_list_status,
-        then export with export_list when completed.
     """
     try:
         leads = _json.loads(leads_json)
@@ -344,27 +366,31 @@ async def generate_batch(
 # Tool 4 — List Lists
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
+@mcp.tool(annotations={
+    "title": "List Lead Lists",
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+})
 async def list_lists(
-    campaign_id: str = "",
-    status: str = "",
-    limit: int = 20,
-    offset: int = 0,
+    campaign_id: Annotated[str, Field(
+        description="Filter by campaign UUID.",
+    )] = "",
+    status: Annotated[str, Field(
+        description="Filter by processing status: 'pending', 'processing', 'completed', or 'failed'.",
+    )] = "",
+    limit: Annotated[int, Field(
+        description="Max results to return, 1-100.",
+    )] = 20,
+    offset: Annotated[int, Field(
+        description="Pagination offset.",
+    )] = 0,
 ) -> str:
     """List lead lists (batch jobs) in the user's MachFive workspace.
 
     Useful for browsing past batches, checking what's in progress, or finding
     a list_id to export. Results are ordered newest first.
-
-    Args:
-        campaign_id: Filter by campaign UUID (optional).
-        status: Filter by processing status: 'pending', 'processing',
-                'completed', or 'failed' (optional).
-        limit: Max results to return, 1-100 (default 20).
-        offset: Pagination offset (default 0).
-
-    Returns:
-        List of lead lists with id, name, status, and timestamps.
     """
     params: dict = {"limit": limit, "offset": offset}
     if campaign_id:
@@ -405,22 +431,23 @@ async def list_lists(
 # Tool 5 — Get List Status (polling)
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
-async def get_list_status(list_id: str) -> str:
+@mcp.tool(annotations={
+    "title": "Get List Status",
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+})
+async def get_list_status(
+    list_id: Annotated[str, Field(
+        description="List UUID from generate_batch or generate_sequence response.",
+    )],
+) -> str:
     """Check the processing status of a lead list.
 
     Use this to POLL after calling generate_batch. Call every 15-30 seconds
     until processing_status is 'completed' or 'failed'.
-
-    When completed: call export_list to download results.
-    When failed: the batch cannot be exported; submit a new batch.
-
-    Args:
-        list_id: The list UUID (from generate_batch or generate_sequence response).
-
-    Returns:
-        Status details including processing_status, leads_count, and emails_created
-        (when completed).
+    When completed, call export_list. When failed, submit a new batch.
     """
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
@@ -462,22 +489,25 @@ async def get_list_status(list_id: str) -> str:
 # Tool 6 — Export List Results
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
-async def export_list(list_id: str, format: str = "json") -> str:
+@mcp.tool(annotations={
+    "title": "Export List",
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+})
+async def export_list(
+    list_id: Annotated[str, Field(
+        description="List UUID to export.",
+    )],
+    format: Annotated[str, Field(
+        description="Output format: 'json' (structured data) or 'csv' (raw CSV for sending tools).",
+    )] = "json",
+) -> str:
     """Download the generated email sequences for a COMPLETED list.
 
     Only call this AFTER get_list_status shows processing_status = 'completed'.
     If the list is not yet completed, you'll get a 409 error — poll first.
-
-    Args:
-        list_id: The list UUID to export.
-        format: Output format — 'json' (default, structured) or 'csv' (raw CSV string).
-                Use 'json' when the agent needs to read/process the sequences.
-                Use 'csv' when the user wants a file to upload to their sending tool.
-
-    Returns:
-        JSON: Structured lead + sequence data.
-        CSV: Raw CSV content (same format as MachFive UI download).
     """
     params = {"format": format}
 

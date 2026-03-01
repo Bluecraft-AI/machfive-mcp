@@ -526,6 +526,176 @@ async def export_list(list_id: str, format: str = "json") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Prompts — pre-built prompt templates for common workflows
+# ---------------------------------------------------------------------------
+
+@mcp.prompt()
+def generate_cold_email(
+    lead_email: str,
+    lead_name: str = "",
+    company: str = "",
+    title: str = "",
+    company_website: str = "",
+    linkedin_url: str = "",
+) -> str:
+    """Generate a personalized cold email sequence for a single lead.
+
+    MachFive uses AI to research the prospect and craft unique, relevant
+    outreach — not templates. The request takes 3-10 minutes.
+    """
+    parts = [f"Generate a personalized cold email sequence for {lead_email}."]
+    if lead_name:
+        parts.append(f"Their name is {lead_name}.")
+    if title:
+        parts.append(f"Their title is {title}.")
+    if company:
+        parts.append(f"They work at {company}.")
+    if company_website:
+        parts.append(f"Company website: {company_website}")
+    if linkedin_url:
+        parts.append(f"LinkedIn: {linkedin_url}")
+    parts.append(
+        "\nWorkflow:\n"
+        "1. Call list_campaigns to find the right campaign "
+        "(every generate request needs a campaign ID)\n"
+        "2. If I haven't specified a campaign, ask me to pick one\n"
+        "3. Call generate_sequence with the campaign ID and all lead details\n"
+        "4. Wait for the full response — it takes 3-10 minutes because "
+        "MachFive researches the prospect and crafts unique emails. "
+        "Do NOT retry if it seems slow.\n"
+        "5. If the request times out, use the returned list_id with "
+        "get_list_status and export_list to recover the results."
+    )
+    return "\n".join(parts)
+
+
+@mcp.prompt()
+def batch_email_workflow(lead_count: str = "multiple") -> str:
+    """Submit multiple leads for batch cold email generation.
+
+    Returns immediately with a list_id. Processing runs in background.
+    Poll for status, then export results when complete.
+    """
+    return (
+        f"I need to generate cold email sequences for {lead_count} leads.\n\n"
+        "Follow this exact workflow:\n"
+        "1. Call list_campaigns — I need a campaign ID. If I haven't specified "
+        "a campaign, ask me to pick one by name or ID.\n"
+        "2. Collect my lead data. Each lead MUST have an email address. "
+        "Optional fields that improve personalization: name, title, company, "
+        "company_website, linkedin_url.\n"
+        "3. Submit the leads with generate_batch — this returns immediately "
+        "with a list_id.\n"
+        "4. Poll get_list_status every 15-30 seconds until processing_status "
+        "is 'completed' or 'failed'.\n"
+        "5. When completed, call export_list to get the generated sequences.\n"
+        "6. If failed, the list cannot be exported — suggest submitting a "
+        "new batch.\n\n"
+        "If I get a 429 error, it means too many concurrent batch jobs — "
+        "wait and retry later.\n\n"
+        "Start by listing my campaigns."
+    )
+
+
+@mcp.prompt()
+def check_batch_status(list_id: str) -> str:
+    """Check status of a batch job and export results when ready."""
+    return (
+        f"Check the status of my batch job with list_id '{list_id}'.\n\n"
+        "Call get_list_status to check processing_status:\n"
+        "- 'completed': Call export_list to get the generated email "
+        "sequences. Show me the results.\n"
+        "- 'processing' or 'pending': Tell me the current status and "
+        "poll again in 15-30 seconds.\n"
+        "- 'failed': The list cannot be exported. Let me know and "
+        "suggest submitting a new batch to retry."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Resources — context data exposed to MCP clients
+# ---------------------------------------------------------------------------
+
+@mcp.resource("machfive://capabilities")
+def server_capabilities() -> str:
+    """MachFive MCP server capabilities, tools, and workflows."""
+    return (
+        "MachFive MCP Server — AI Cold Email Generator\n"
+        "Generate personalized cold email sequences from lead data. "
+        "MachFive uses AI to research prospects and craft unique, relevant "
+        "outreach — not templates.\n\n"
+        "TOOLS:\n"
+        "  1. list_campaigns    — List campaigns (call FIRST — every generate "
+        "request needs a campaign ID)\n"
+        "  2. generate_sequence — Generate emails for one lead (synchronous, "
+        "3-10 min)\n"
+        "  3. generate_batch    — Submit multiple leads (async, returns "
+        "immediately with list_id)\n"
+        "  4. list_lists        — Browse lead lists and batch jobs\n"
+        "  5. get_list_status   — Poll batch status until completed or failed\n"
+        "  6. export_list       — Download results as JSON or CSV\n\n"
+        "SINGLE LEAD FLOW:\n"
+        "  list_campaigns → generate_sequence (wait 3-10 min) → done\n"
+        "  Recovery: if timeout, use list_id with get_list_status + export_list\n\n"
+        "BATCH FLOW:\n"
+        "  list_campaigns → generate_batch → poll get_list_status every "
+        "15-30s → export_list when completed\n\n"
+        "ERRORS:\n"
+        "  400 = Invalid request or missing email\n"
+        "  401 = Invalid or missing API key\n"
+        "  402 = Out of credits\n"
+        "  403 = Campaign not in your workspace\n"
+        "  404 = Campaign or list not found\n"
+        "  409 = Export called before list completed (poll first)\n"
+        "  429 = Too many concurrent batch jobs (retry later)\n\n"
+        "Authentication: Each user provides their own MachFive API key.\n"
+        "Get yours at https://app.machfive.io → Settings → API Keys"
+    )
+
+
+@mcp.resource("machfive://lead-fields")
+def lead_fields_reference() -> str:
+    """Lead data fields and generation options accepted by MachFive."""
+    return (
+        "LEAD FIELDS:\n\n"
+        "  email           — REQUIRED. Lead's email address. Used to map the "
+        "lead through processing and match sequences in exports.\n"
+        "  name            — Optional. Full name (improves personalization)\n"
+        "  title           — Optional. Job title, e.g. VP of Sales\n"
+        "  company         — Optional. Company name\n"
+        "  company_website — Optional. Company URL for AI research\n"
+        "  linkedin_url    — Optional. LinkedIn profile for deeper "
+        "personalization\n\n"
+        "GENERATION OPTIONS:\n\n"
+        "  email_count     — Emails per sequence, 1-5 (default 3)\n"
+        "  list_name       — Display name for this list in MachFive UI\n"
+        "  email_signature — Signature appended to each email\n"
+        "  campaign_angle  — Additional context/angle for personalization\n"
+        "  approved_ctas   — List of CTAs to use, e.g. "
+        "['Direct Meeting CTA', 'Lead Magnet CTA']. "
+        "Omit to use campaign defaults.\n\n"
+        "LIMITS:\n\n"
+        "  Single lead (sync): 3-10 minutes. Use timeout of 300-600 seconds.\n"
+        "  Batch (async): Returns immediately. Poll every 15-30 seconds.\n"
+        "  List query: limit default 50, max 100. Use offset for pagination."
+    )
+
+
+@mcp.resource("machfive://pricing")
+def pricing_info() -> str:
+    """MachFive pricing tiers and credit usage."""
+    return (
+        "MACHFIVE PRICING:\n\n"
+        "  Free:       100 credits/month\n"
+        "  Starter:  2,000 credits/month\n"
+        "  Growth:   5,000 credits/month\n"
+        "  Enterprise: Custom credits/month\n\n"
+        "1 credit = 1 lead processed (full email sequence).\n\n"
+        "Get started: https://machfive.io"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

@@ -1,5 +1,8 @@
 # MachFive MCP Server
 
+[![MCP Badge](https://lobehub.com/badge/mcp/bluecraft-ai-machfive-mcp)](https://lobehub.com/mcp/bluecraft-ai-machfive-mcp)
+[![smithery badge](https://smithery.ai/badge/machfive-cold-email)](https://smithery.ai/server/machfive/cold-email)
+
 ## What is MachFive MCP Server?
 
 MCP (Model Context Protocol) is an open standard that lets AI assistants like Claude connect to external apps. Think of it as a universal translator between AI and software.

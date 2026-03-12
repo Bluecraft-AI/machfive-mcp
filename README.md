@@ -18,6 +18,10 @@ Instead of logging into MachFive, uploading CSVs, and waiting for results, you c
 
 Your AI understands the request, connects to MachFive through MCP, and executes the action — all in seconds.
 
+<a href="https://glama.ai/mcp/servers/Bluecraft-AI/machfive-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/Bluecraft-AI/machfive-mcp/badge" alt="MachFive Cold Email MCP server" />
+</a>
+
 ---
 
 ## How to Set Up MachFive MCP

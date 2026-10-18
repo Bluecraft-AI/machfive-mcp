@@ -24,7 +24,7 @@ Your AI understands the request, connects to MachFive through MCP, and executes 
 
 ### Step 1: Get Your API Key (2 min)
 
-1. Log in to your MachFive account at [app.machfive.io](https://app.machfive.io)
+1. Log in to your MachFive account at [app.machfive.co](https://app.machfive.co)
 2. Go to **Settings → API Keys**
 3. Click **Create API Key**
 4. Copy your key and store it securely
@@ -42,7 +42,7 @@ Your AI understands the request, connects to MachFive through MCP, and executes 
 3. Click **Add custom connector**
 4. Enter:
    - **Name:** MachFive
-   - **Remote MCP server URL:** `https://mcp.machfive.io/mcp/YOUR_API_KEY`
+   - **Remote MCP server URL:** `https://mcp.machfive.co/mcp/YOUR_API_KEY`
 5. Replace `YOUR_API_KEY` with the API key you created
 6. Click **Add** — no restart needed!
 
@@ -57,7 +57,7 @@ If you prefer editing the config file directly:
 {
   "mcpServers": {
     "machfive": {
-      "url": "https://mcp.machfive.io/mcp",
+      "url": "https://mcp.machfive.co/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_API_KEY"
       }
@@ -79,7 +79,7 @@ If you prefer editing the config file directly:
 {
   "mcpServers": {
     "machfive": {
-      "url": "https://mcp.machfive.io/mcp",
+      "url": "https://mcp.machfive.co/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_API_KEY"
       }
@@ -96,7 +96,7 @@ For automating workflows with AI agents in n8n:
 
 1. Add the **MCP Client** node to your workflow
 2. Select **Streamable HTTP** as the transport option
-3. Enter the URL: `https://mcp.machfive.io/mcp/YOUR_API_KEY`
+3. Enter the URL: `https://mcp.machfive.co/mcp/YOUR_API_KEY`
 4. Connect to your AI agent node
 
 #### Option E: Other MCP Clients
@@ -104,7 +104,7 @@ For automating workflows with AI agents in n8n:
 For any MCP-compatible client, use the URL with your API key:
 
 ```
-https://mcp.machfive.io/mcp/YOUR_API_KEY
+https://mcp.machfive.co/mcp/YOUR_API_KEY
 ```
 
 This URL works with any client that supports Streamable HTTP transport.
@@ -127,7 +127,7 @@ MachFive MCP supports three authentication methods:
 
 | Method | Format | Best For |
 |--------|--------|----------|
-| **URL path** | `https://mcp.machfive.io/mcp/YOUR_API_KEY` | Clients without header support, n8n |
+| **URL path** | `https://mcp.machfive.co/mcp/YOUR_API_KEY` | Clients without header support, n8n |
 | **Authorization header** | `Authorization: Bearer YOUR_API_KEY` | Claude Desktop, Cursor |
 | **Authorization header (no prefix)** | `Authorization: YOUR_API_KEY` | Simplified integrations |
 
@@ -258,7 +258,7 @@ Your AI can:
 The MCP server is free with your MachFive subscription. Email generation uses your account's credits as normal.
 
 ### 6. What's the connection URL?
-`https://mcp.machfive.io/mcp`
+`https://mcp.machfive.co/mcp`
 
 ### 7. How long does email generation take?
 Single lead generation (`generate_sequence`) takes 3-10 minutes because MachFive researches the prospect and crafts truly personalized emails. Batch generation (`generate_batch`) returns immediately — processing happens in the background, and you poll for completion.
@@ -272,9 +272,9 @@ Generation is non-destructive — it creates new email sequences without affecti
 
 | Endpoint | URL |
 |----------|-----|
-| Health check | `https://mcp.machfive.io/` |
-| MCP protocol | `https://mcp.machfive.io/mcp` |
-| MCP with API key | `https://mcp.machfive.io/mcp/YOUR_API_KEY` |
+| Health check | `https://mcp.machfive.co/` |
+| MCP protocol | `https://mcp.machfive.co/mcp` |
+| MCP with API key | `https://mcp.machfive.co/mcp/YOUR_API_KEY` |
 
 ---
 

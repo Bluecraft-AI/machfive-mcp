@@ -1,0 +1,311 @@
+# MachFive OAuth 2.0 Implementation — Complete Guide
+
+There are **4 phases**: Supabase config, consent screen UI, MCP server code update, and testing. This is confirmed against Anthropic's Connectors FAQ, Supabase's OAuth Server docs, and FastMCP's `SupabaseProvider` source.
+
+---
+
+## Phase 1 — Configure Supabase OAuth Server
+
+**Step 1.1 — Switch JWT signing to RS256**
+
+Supabase defaults to HS256 (symmetric). OAuth requires asymmetric keys so clients can validate tokens without your secret.
+
+1. Go to your Supabase dashboard → **Authentication** → **Signing Keys** (under JSON Web Tokens)
+2. Generate a new RS256 or ES256 key
+3. Set it as the active signing key
+4. ⚠️ This changes how all JWTs are signed — make sure your existing app's token validation isn't hardcoded to HS256 before doing this
+
+**Step 1.2 — Enable the OAuth Server**
+
+1. Go to **Authentication** → **OAuth Server** in the sidebar
+2. Toggle **"Enable OAuth server functionality"** on
+3. Set the **Authorization Path** to `/oauth/consent`
+   - Your Site URL is `https://app.machfive.co` (from **Authentication** → **URL Configuration**)
+   - This means the full consent screen URL will be `https://app.machfive.co/oauth/consent`
+4. Enable **Dynamic Client Registration** — this lets Claude.ai register itself automatically without you needing to pre-register it
+
+Once enabled, Supabase exposes these endpoints automatically (replace `<project-ref>` with your actual Supabase project ref):
+
+```
+Authorization:  https://<project-ref>.supabase.co/auth/v1/oauth/authorize
+Token:          https://<project-ref>.supabase.co/auth/v1/oauth/token
+JWKS:           https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+Discovery:      https://<project-ref>.supabase.co/.well-known/oauth-authorization-server/auth/v1
+```
+
+MCP clients like Claude.ai will **auto-discover** all of this from the discovery URL — you don't have to configure anything on their end.
+
+---
+
+## Phase 2 — Build the Consent Screen UI
+
+This is the only frontend work. When a user connects MachFive inside Claude.ai, they get redirected to `https://app.machfive.co/oauth/consent?authorization_id=<id>`. You need to build that page.
+
+Your MachFive app is Next.js on Vercel. Create two files:
+
+**File 1: `app/oauth/consent/page.tsx`** — the consent screen
+
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export default async function ConsentPage({
+  searchParams,
+}: {
+  searchParams: { authorization_id?: string }
+}) {
+  const authorizationId = (await searchParams).authorization_id
+
+  if (!authorizationId) {
+    return <div>Error: Missing authorization_id</div>
+  }
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: async () => (await cookies()).getAll(),
+        setAll: async (cookiesToSet) => {
+          const cookieStore = await cookies()
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // If user isn't logged in, send them to login first
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect(`/login?redirect=/oauth/consent?authorization_id=${authorizationId}`)
+  }
+
+  // Get details about what Claude is requesting
+  const { data: authDetails, error } =
+    await supabase.auth.oauth.getAuthorizationDetails(authorizationId)
+
+  if (error || !authDetails) {
+    return <div>Error: {error?.message || 'Invalid authorization request'}</div>
+  }
+
+  return (
+    <div style={{ maxWidth: 480, margin: '80px auto', fontFamily: 'sans-serif' }}>
+      <h1>Connect MachFive to Claude</h1>
+      <p><strong>{authDetails.client.name}</strong> is requesting access to your MachFive account.</p>
+      <p>This will allow Claude to list your campaigns, generate email sequences, and export results on your behalf.</p>
+
+      <form action="/api/oauth/decision" method="POST">
+        <input type="hidden" name="authorization_id" value={authorizationId} />
+        <button type="submit" name="decision" value="approve">
+          Allow Access
+        </button>
+        <button type="submit" name="decision" value="deny">
+          Deny
+        </button>
+      </form>
+    </div>
+  )
+}
+```
+
+**File 2: `app/api/oauth/decision/route.ts`** — handles Approve/Deny
+
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+
+export async function POST(request: Request) {
+  const formData = await request.formData()
+  const decision = formData.get('decision')
+  const authorizationId = formData.get('authorization_id') as string
+
+  if (!authorizationId) {
+    return NextResponse.json({ error: 'Missing authorization_id' }, { status: 400 })
+  }
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: async () => (await cookies()).getAll(),
+        setAll: async (cookiesToSet) => {
+          const cookieStore = await cookies()
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  if (decision === 'approve') {
+    const { data, error } = await supabase.auth.oauth.approveAuthorization(authorizationId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.redirect(data.redirect_to)
+  } else {
+    const { data, error } = await supabase.auth.oauth.denyAuthorization(authorizationId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.redirect(data.redirect_to)
+  }
+}
+```
+
+Deploy this to Vercel. Confirm `https://app.machfive.co/oauth/consent` loads before moving on.
+
+---
+
+## Phase 3 — Update `server.py` on Railway
+
+This is the smallest change. FastMCP has a built-in `SupabaseProvider` that handles everything — JWT verification, discovery metadata forwarding, DCR. You're swapping ~5 lines.
+
+**Step 3.1 — Update `requirements.txt`**
+
+```
+fastmcp>=2.13.0
+httpx>=0.27.0
+supabase>=2.0.0
+```
+
+**Step 3.2 — Update `server.py`**
+
+At the top, replace your current auth setup with:
+
+```python
+from fastmcp import FastMCP, Context
+from fastmcp.server.auth.providers.supabase import SupabaseProvider
+from fastmcp.server.dependencies import get_http_headers
+import httpx
+import os
+
+SUPABASE_PROJECT_URL = os.environ["SUPABASE_PROJECT_URL"]  # e.g. https://abc123.supabase.co
+MCP_BASE_URL = os.environ.get("MCP_BASE_URL", "https://mcp.machfive.co")
+
+supabase_auth = SupabaseProvider(
+    project_url=SUPABASE_PROJECT_URL,
+    base_url=MCP_BASE_URL,
+    algorithm="RS256",  # Must match what you set in Supabase Step 1.1
+)
+
+mcp = FastMCP("MachFive Cold Email", auth=supabase_auth)
+```
+
+**Step 3.3 — Update how tools get the user's API key**
+
+Currently each tool reads a Bearer token directly as the MachFive API key. Now the Bearer token is a Supabase JWT. You need to look up the user's MachFive API key from their Supabase user record.
+
+You have two options:
+
+**Option A (simplest):** Store each user's MachFive API key in their Supabase user metadata (`user_metadata` or a `profiles` table), then look it up from the validated token.
+
+**Option B (current-compatible bridge):** Use the Supabase user's `id` or `email` to look up their MachFive API key from your existing database.
+
+In practice, add a helper function:
+
+```python
+from supabase import create_client
+from fastmcp.server.dependencies import get_access_token
+
+SUPABASE_URL = os.environ["SUPABASE_PROJECT_URL"]
+SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+
+async def get_machfive_api_key_for_user(user_id: str) -> str:
+    """Look up the MachFive API key for an authenticated Supabase user."""
+    sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    result = sb.table("profiles").select("machfive_api_key").eq("id", user_id).single().execute()
+    if not result.data or not result.data.get("machfive_api_key"):
+        raise ValueError("No MachFive API key found for this user")
+    return result.data["machfive_api_key"]
+```
+
+Then inside each tool, instead of reading the header directly:
+
+```python
+@mcp.tool()
+async def list_campaigns(ctx: Context) -> str:
+    token = get_access_token(ctx)         # Gets the validated Supabase JWT
+    user_id = token.client_id             # Supabase user ID from the token
+    api_key = await get_machfive_api_key_for_user(user_id)
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://app.machfive.co/api/campaigns",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30.0
+        )
+    # ... rest of tool logic
+```
+
+**Step 3.4 — Add environment variables to Railway**
+
+In your Railway dashboard → your MachFive MCP service → **Variables**, add:
+
+```
+SUPABASE_PROJECT_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your service role key from Supabase Settings → API>
+MCP_BASE_URL=https://mcp.machfive.co
+```
+
+**Step 3.5 — Push to GitHub → Railway auto-deploys**
+
+---
+
+## Phase 4 — Test End to End
+
+**Step 4.1 — Test discovery endpoint**
+
+Open in browser:
+```
+https://<project-ref>.supabase.co/.well-known/oauth-authorization-server/auth/v1
+```
+Should return a JSON object with `authorization_endpoint`, `token_endpoint`, `jwks_uri`, etc. If it does, Supabase's OAuth Server is live.
+
+**Step 4.2 — Test with MCP Inspector**
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+1. Set Transport Type to **Streamable HTTP**
+2. Enter URL: `https://mcp.machfive.co/mcp`
+3. Click **"Open Auth Settings"** → **"Quick OAuth Flow"**
+4. It will redirect you to `https://app.machfive.co/oauth/consent`
+5. Log in with a MachFive account → click Allow
+6. Should return to Inspector as authenticated
+7. Run `list_campaigns` — should return your campaigns
+
+**Step 4.3 — Test in Claude.ai**
+
+1. Go to **Settings** → **Connectors** → **Add custom connector**
+2. Enter `https://mcp.machfive.co/mcp`
+3. Should prompt for OAuth → redirect to your consent screen → come back authenticated
+4. Try: *"List my MachFive campaigns"*
+
+---
+
+## Important Note on the Timeout Issue
+
+Separately from OAuth — Anthropic's FAQ confirms **claude.ai and Claude Desktop have a 300-second (5 minute) tool timeout**. Your single-lead generation tool with a 660-second timeout will get killed. Before submitting to Anthropic, that tool needs to be converted to the same async pattern as batch: return a job ID immediately, then the agent polls `get_list_status`. This is a separate ticket but it's a hard requirement for the Directory.
+
+---
+
+## Summary Checklist Before Submitting to Anthropic
+
+| Item | Status |
+|---|---|
+| Supabase OAuth Server enabled + RS256 JWT | 🔲 To do |
+| Consent screen live at `app.machfive.co/oauth/consent` | 🔲 To do |
+| `server.py` updated with `SupabaseProvider` | 🔲 To do |
+| Discovery endpoint returns valid JSON | 🔲 To do |
+| MCP Inspector OAuth flow works end-to-end | 🔲 To do |
+| Single-lead generation tool converted to async | 🔲 To do |
+| Testing account created for Anthropic reviewers | 🔲 To do |
+| Privacy policy URL | ✅ Done |
+| Tool annotations | ✅ Done |
+| Streamable HTTP | ✅ Done |
+| Support channel | ✅ Done |
+| 3+ example prompts | ✅ Done |

@@ -40,7 +40,7 @@ logger = logging.getLogger("machfive-mcp")
 
 # Fallback key for local/stdio usage; remote users pass their own
 MACHFIVE_API_KEY = os.environ.get("MACHFIVE_API_KEY", "")
-MACHFIVE_BASE_URL = os.environ.get("MACHFIVE_BASE_URL", "https://app.machfive.io")
+MACHFIVE_BASE_URL = os.environ.get("MACHFIVE_BASE_URL", "https://app.machfive.co")
 PORT = int(os.environ.get("PORT", 8000))
 TRANSPORT = os.environ.get("MCP_TRANSPORT", "streamable-http")
 
@@ -145,7 +145,7 @@ async def list_campaigns(
     campaigns = data.get("campaigns", [])
 
     if not campaigns:
-        return "No campaigns found. Create a campaign at https://app.machfive.io first."
+        return "No campaigns found. Create a campaign at https://app.machfive.co first."
 
     lines = ["Available campaigns:\n"]
     for c in campaigns:
@@ -679,7 +679,7 @@ def server_capabilities() -> str:
         "  409 = Export called before list completed (poll first)\n"
         "  429 = Too many concurrent batch jobs (retry later)\n\n"
         "Authentication: Each user provides their own MachFive API key.\n"
-        "Get yours at https://app.machfive.io → Settings → API Keys"
+        "Get yours at https://app.machfive.co → Settings → API Keys"
     )
 
 
@@ -721,7 +721,7 @@ def pricing_info() -> str:
         "  Growth:   5,000 credits/month\n"
         "  Enterprise: Custom credits/month\n\n"
         "1 credit = 1 lead processed (full email sequence).\n\n"
-        "Get started: https://machfive.io"
+        "Get started: https://machfive.co"
     )
 
 

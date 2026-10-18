@@ -27,7 +27,7 @@ MACHFIVE_JSON=$(cat <<EOF
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.machfive.io/mcp"
+      "url": "https://mcp.machfive.co/mcp"
     }
   ]
 }
@@ -52,7 +52,7 @@ COLD_EMAIL_JSON=$(cat <<EOF
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.machfive.io/mcp/{api_key}",
+      "url": "https://mcp.machfive.co/mcp/{api_key}",
       "variables": {
         "api_key": {
           "description": "Your MachFive API key",

@@ -278,6 +278,6 @@ Generation is non-destructive — it creates new email sequences without affecti
 
 ---
 
-**Need help?** Contact us at [support@machfive.io](mailto:support@machfive.io)
+**Need help?** Contact us at [support@machfive.co](mailto:support@machfive.co)
 
 **MCP Documentation:** [modelcontextprotocol.io](https://modelcontextprotocol.io)
